@@ -1,0 +1,183 @@
+<html>
+	<head>
+		<title>영화진흥위원회</title>
+		<script src="../js/jquery.min.js"></script>
+		<script src="../js/vue.min.js"></script>
+		
+		<style>
+			.item {
+				list-style : none;
+				width : 1200px;
+				overflow : hidden;
+			}
+			.item li {
+				width : 100px;
+				float : left;
+			}
+			.item li.nm{
+				width : 400px;
+				float : left;
+			}
+		</style>
+	</head>
+	
+	<div id="app">
+		<!-- Search -->
+		<div>
+			<ul style="list-style: none;">
+				<li>영화명 : <input type="text" v-model="input.movieNm" 
+									v-on:keyup.enter="fn_search();" /></li>
+				<li>감독명 : <input type="text" v-model="input.directorNm"
+									v-on:keyup.enter="fn_search();" /></li>
+				<li>개봉일 : <input type="text" v-model="input.openDt"
+									v-on:keyup.enter="fn_search();" /></li>
+				<li><button v-on:click="fn_search();">검색</button></li>
+			</ul>
+		</div>
+		<!-- //Search -->
+		
+		<!-- Result -->
+		<div>
+			<ul v-for="film in output.movie.list" class="item">
+				<li>
+					<a href="#" v-text="film.movieCd"
+								v-on:click="fn_detail(film)"></a>
+				</li>
+				<li class="nm" v-text="film.movieNm"></li>
+				<li class="nm" v-text="film.movieNmEn"></li>
+				<li v-text="film.openDt"></li>
+				<li v-text="film.repGenreNm"></li>
+				<li v-text="film.repNationNm"></li>
+			</ul>
+		</div>
+		<!-- //Result -->
+		
+		<!-- Detail -->
+		<div v-text="output.movie.detail"></div>
+		<!-- //Detail -->
+		
+	</div>
+	
+	<script>
+		var app = new Vue({
+			el: "#app",
+			data: {
+				kobis: {
+					movie: {
+						search: "http://www.kobis.or.kr/kobisopenapi/webservice/rest/movie/searchMovieList.json",
+						detail: "http://www.kobis.or.kr/kobisopenapi/webservice/rest/movie/searchMovieInfo.json"
+					},
+					people: {
+						detail: "http://www.kobis.or.kr/kobisopenapi/webservice/rest/people/searchPeopleInfo.json"
+					}
+				},
+				tmdb: {
+					movie: {
+						search: "https://api.themoviedb.org/3/search/movie"
+					}
+				},
+				input: {
+					movieNm:"",
+					directorNm: "",
+					openDt: ""
+				},
+				output: {
+					movie:{
+						list:[],
+						detail:{}
+					}
+				}
+			},
+			mounted: function() {
+				console.log("$EL Mounted! 이제부터 this를 사용 할 수 있어요~")
+				console.log(this.kobis.movie.search);
+				console.log(this.kobis.movie.detail);
+				
+				this.output.movie.detail = {
+					kobis: {
+					},
+					tmdb: {
+					}
+				}
+			},
+			methods:{
+				fn_search: function() {
+					this.output.movie.list = [];
+					
+					$.ajax({
+						url: this.kobis.movie.search,
+						data: {
+							key			: "",	// <<< 영화진흥위원회 API KEY
+							movieNm		: this.input.movieNm,
+							directorNm	: this.input.directorNm,
+							openStartDt	: this.input.openDt,
+							openEndDt	: this.input.openDt
+						},
+						type: 'get',
+						dataType: 'json',
+						success: function(data){
+							var result = data.movieListResult.movieList;
+							
+							for( var idx=0; idx<result.length; idx++ ) {
+								var film = result[idx];
+								
+								app.output.movie.list.push({
+									movieCd: film.movieCd,
+									movieNm: film.movieNm,
+									movieNmEn: film.movieNmEn,
+									openDt: film.openDt,
+									repGenreNm: film.repGenreNm,
+									repNationNm: film.repNationNm
+								})
+							}
+						}
+					})
+				},
+				
+				fn_detail: function(film) {
+					$.ajax({
+						url: this.kobis.movie.detail,
+						data: {
+							key : "",	// <<< 영화진흥위원회 API KEY
+							movieCd : film.movieCd
+						},
+						type: 'get',
+						dataType: 'json',
+						success: function(data) {
+							var result = data.movieInfoResult.movieInfo;
+							app.output.movie.detail.kobis = {
+								movieCd : result.movieCd,
+								showTm : result.showTm,
+								genres : result.genres,
+								audits : result.audits,
+								directors : result.directors,
+								actors : result.actors
+							};
+						}
+					}).done(function() {
+						$.ajax({
+							url: app.tmdb.movie.search,
+							data: {
+								api_key : "",	// <<< TMDB API KEY
+								query : film.movieNm,
+								year : film.openDt
+							},
+							type: 'get',
+							dataType: 'json',
+							success: function(data) {
+								if( data.results.length > 0 ) {
+									var result = data.results[0];
+								
+									app.output.movie.detail.tmdb = {
+										poster : result.poster_path,
+										thumbnail : result.backdrop_path
+									};
+								}
+							}
+						});
+					});
+				}
+			}
+		});
+	</script>
+</html>
